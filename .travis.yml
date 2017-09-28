@@ -1,0 +1,24 @@
+language: go
+
+matrix:
+  include:
+    - go: 1.8.x
+    - master
+
+before_install:
+  - go get -t -v ./...
+  - go get github.com/modocache/gover
+  - go get github.com/mattn/goveralls
+
+services:
+  - redis-server
+  
+script:
+  - go test -race -v ./...
+  - go test -coverprofile=redislock.coverprofile
+  - gover
+  - goveralls -coverprofile=redislock.coverprofile -service=travis-ci
+
+notifications:
+  email:
+    on_success: never
