@@ -16,9 +16,7 @@ var lockerWait *Locker
 
 func init() {
 	client := redis.NewClient(&redis.Options{
-		Addr:     "127.0.0.1:6379",
-		Password: "", // no password set
-		DB:       0,  // use default DB
+		Addr: "127.0.0.1:6379",
 	})
 	var err error
 	locker, err = NewLocker([]*redis.Client{client}, Options{})
@@ -52,13 +50,13 @@ func TestLocker(t *testing.T) {
 	assert.NotNil(err)
 	assert.Nil(nillock)
 
-	lock.Release()
+	lock.Unlock()
 
 	lock, err = locker.Lock(payment)
 	assert.Nil(err)
 	assert.NotNil(lock)
 
-	lock.Release()
+	lock.Unlock()
 
 	lock, err = locker.Lock(payment)
 	assert.Nil(err)
@@ -70,7 +68,7 @@ func TestLocker(t *testing.T) {
 
 	for i := 0; i < 100; i++ {
 		go func() {
-			lock.Release()
+			lock.Unlock()
 		}()
 	}
 	time.Sleep(100 * time.Millisecond)
@@ -84,12 +82,12 @@ func TestLockerWait(t *testing.T) {
 
 	// wait 2 second
 	nillock, err := lockerWait.Lock(payment)
-	assert.NotNil(err)
+	assert.Equal(ErrGetLockFailed, err)
 	assert.Nil(nillock)
 
 	go func() {
 		time.Sleep(time.Second)
-		lock.Release()
+		lock.Unlock()
 	}()
 	// successfull wait
 	newlock, err := lockerWait.Lock(payment)

@@ -14,9 +14,7 @@ var locker *redislock.Locker
 
 func init() {
 	client := redis.NewClient(&redis.Options{
-		Addr:     "127.0.0.1:6379",
-		Password: "", // no password set
-		DB:       0,  // use default DB
+		Addr: "127.0.0.1:6379",
 	})
 	var err error
 	locker, err = redislock.NewLocker([]*redis.Client{client}, redislock.Options{})
@@ -31,7 +29,7 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-	defer lock.Release()
+	defer lock.Unlock()
 
 	fmt.Println("have a lock")
 

@@ -1,3 +1,5 @@
+// https://redis.io/topics/distlock
+
 package redislock
 
 import (
@@ -20,7 +22,23 @@ var (
 const (
 	defaultRedisKeyPrefix = "redislock:"
 	luaRelease            = `if redis.call("get", KEYS[1]) == ARGV[1] then return redis.call("del", KEYS[1]) else return 0 end`
+	clockDriftFactor      = 0.01
 )
+
+var (
+	quorum int
+)
+
+// Options ...
+type Options struct {
+	KeyPrefix string
+	// The maximum duration to lock a key, Default: 10s
+	LockTimeout time.Duration
+	// The maximum duration to wait to get the lock, Default: 0s, do not wait
+	WaitTimeout time.Duration
+	// The maximum wait retry time to get the lock again, Default: 100ms
+	WaitRetry time.Duration
+}
 
 // NewLocker ...
 func NewLocker(clients []*redis.Client, opts Options) (*Locker, error) {
@@ -39,6 +57,7 @@ func NewLocker(clients []*redis.Client, opts Options) (*Locker, error) {
 	if opts.LockTimeout == 0 {
 		opts.LockTimeout = 10 * time.Second
 	}
+	quorum = len(clients)/2 + 1
 	return &Locker{
 		clients: clients,
 		opts:    &opts,
@@ -51,15 +70,19 @@ type Locker struct {
 	opts    *Options
 }
 
-// Options ...
-type Options struct {
-	KeyPrefix string
-	// The maximum duration to lock a key, Default: 10s
-	LockTimeout time.Duration
-	// The maximum duration to wait to get the lock, Default: 0s, do not wait
-	WaitTimeout time.Duration
-	// The maximum wait retry time to get the lock again, Default: 100ms
-	WaitRetry time.Duration
+// Lock lock
+func (l *Locker) Lock(key string) (*Lock, error) {
+	lock := &Lock{
+		session: randomValue(),
+		lockkey: key,
+		clients: l.clients,
+		opts:    l.opts,
+	}
+	err := lock.lock()
+	if err != nil {
+		return nil, err
+	}
+	return lock, nil
 }
 
 // Lock ...
@@ -71,8 +94,8 @@ type Lock struct {
 	clock   sync.Mutex
 }
 
-// Release the lock
-func (l *Lock) Release() {
+// Unlock the lock
+func (l *Lock) Unlock() {
 	l.clock.Lock()
 	defer l.clock.Unlock()
 	if l.lockkey == "" {
@@ -96,9 +119,9 @@ func (l *Lock) lock() error {
 				successful++
 			}
 		}
-		deviation := l.opts.LockTimeout / 100
-		validity := l.opts.LockTimeout - time.Since(start) - deviation
-		if validity > 0 && successful > len(l.clients)/2 {
+		drift := (l.opts.LockTimeout / 100) + (time.Millisecond * 2)
+		validity := l.opts.LockTimeout - time.Since(start) - drift
+		if successful >= quorum && validity > 0 {
 			return nil
 		}
 		if time.Now().Add(l.opts.WaitRetry).After(stop) {
@@ -107,21 +130,6 @@ func (l *Lock) lock() error {
 		time.Sleep(l.opts.WaitRetry)
 	}
 	return ErrGetLockFailed
-}
-
-// Lock lock
-func (l *Locker) Lock(key string) (*Lock, error) {
-	lock := &Lock{
-		session: randomValue(),
-		lockkey: key,
-		clients: l.clients,
-		opts:    l.opts,
-	}
-	err := lock.lock()
-	if err != nil {
-		return nil, err
-	}
-	return lock, nil
 }
 
 func randomValue() string {
