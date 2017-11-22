@@ -6,10 +6,9 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	redis "gopkg.in/redis.v5"
 )
-
-const payment = "payment"
 
 var locker *Locker
 var lockerWait *Locker
@@ -18,6 +17,7 @@ func init() {
 	client := redis.NewClient(&redis.Options{
 		Addr: "127.0.0.1:6379",
 	})
+	log.Println(client.Ping())
 	var err error
 	locker, err = NewLocker([]*redis.Client{client}, Options{})
 	if err != nil {
@@ -32,24 +32,32 @@ func init() {
 }
 func TestWrongOpts(t *testing.T) {
 	assert := assert.New(t)
-	locker, err := NewLocker([]*redis.Client{}, Options{})
+	l, err := NewLocker([]*redis.Client{}, Options{})
 	assert.NotNil(err)
-	assert.Nil(locker)
+	assert.Nil(l)
 
-	locker, err = NewLocker([]*redis.Client{&redis.Client{}, &redis.Client{}}, Options{})
+	l, err = NewLocker([]*redis.Client{&redis.Client{}, &redis.Client{}}, Options{})
 	assert.NotNil(err)
-	assert.Nil(locker)
+	assert.Nil(l)
 }
 func TestLocker(t *testing.T) {
+	payment := "TestLocker:payment"
 	assert := assert.New(t)
+	require := require.New(t)
 	lock, err := locker.Lock(payment)
-	assert.Nil(err)
-	assert.NotNil(lock)
+	require.Nil(err)
+	require.NotNil(lock)
+	assert.Equal(100*time.Millisecond, lock.opts.WaitRetry)
+	assert.Equal(10*time.Second, lock.opts.LockTimeout)
+	assert.Equal(time.Duration(0), lock.opts.WaitTimeout)
 
+	start := time.Now()
 	nillock, err := locker.Lock(payment)
+	assert.True(time.Since(start) < 50*time.Millisecond)
 	assert.NotNil(err)
-	assert.Nil(nillock)
+	require.Nil(nillock)
 
+	require.NotNil(lock)
 	lock.Unlock()
 
 	lock, err = locker.Lock(payment)
@@ -74,9 +82,11 @@ func TestLocker(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 }
 func TestLockerWait(t *testing.T) {
+	payment := randomValue()
 
 	assert := assert.New(t)
 	lock, err := lockerWait.Lock(payment)
+	assert.Equal(defaultRedisKeyPrefix+payment, lock.lockkey)
 	assert.Nil(err)
 	assert.NotNil(lock)
 
@@ -87,10 +97,24 @@ func TestLockerWait(t *testing.T) {
 
 	go func() {
 		time.Sleep(time.Second)
-		lock.Unlock()
+		if assert.NotNil(lock) {
+			lock.Unlock()
+		}
 	}()
 	// successfull wait
 	newlock, err := lockerWait.Lock(payment)
 	assert.Nil(err)
 	assert.NotNil(newlock)
+}
+
+func TestWrongRedis(t *testing.T) {
+	assert := assert.New(t)
+
+	client := redis.NewClient(&redis.Options{
+		Addr: "127.0.0.1:9999",
+	})
+	locker, err := NewLocker([]*redis.Client{client}, Options{})
+	assert.Nil(err)
+	_, err = locker.Lock("x")
+	assert.Equal(ErrGetLockFailed, err)
 }

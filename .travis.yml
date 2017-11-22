@@ -14,7 +14,7 @@ services:
   - redis-server
   
 script:
-  - go test -race -v ./...
+  - go test -v ./...
   - go test -coverprofile=redislock.coverprofile
   - gover
   - goveralls -coverprofile=redislock.coverprofile -service=travis-ci

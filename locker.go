@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -74,9 +75,10 @@ type Locker struct {
 func (l *Locker) Lock(key string) (*Lock, error) {
 	lock := &Lock{
 		session: randomValue(),
-		lockkey: key,
+		lockkey: l.opts.KeyPrefix + key,
 		clients: l.clients,
 		opts:    l.opts,
+		clock:   new(sync.Mutex),
 	}
 	err := lock.lock()
 	if err != nil {
@@ -91,7 +93,7 @@ type Lock struct {
 	lockkey string
 	clients []*redis.Client
 	opts    *Options
-	clock   sync.Mutex
+	clock   *sync.Mutex
 }
 
 // Unlock the lock
@@ -110,19 +112,29 @@ func (l *Lock) Unlock() {
 
 // Lock lock
 func (l *Lock) lock() error {
-	stop := time.Now().Add(l.opts.WaitTimeout)
+	var stop time.Time
+	if l.opts.WaitTimeout > 0 {
+		stop = time.Now().Add(l.opts.WaitTimeout)
+	}
 	for {
 		successful := 0
 		start := time.Now()
 		for _, client := range l.clients {
-			if client.SetNX(l.lockkey, l.session, l.opts.LockTimeout).Val() {
+			ok, err := client.SetNX(l.lockkey, l.session, l.opts.LockTimeout).Result()
+			if ok {
 				successful++
+			}
+			if err != nil {
+				log.Println("redislock:", err)
 			}
 		}
 		drift := (l.opts.LockTimeout / 100) + (time.Millisecond * 2)
 		validity := l.opts.LockTimeout - time.Since(start) - drift
 		if successful >= quorum && validity > 0 {
 			return nil
+		}
+		if l.opts.WaitTimeout == 0 {
+			break
 		}
 		if time.Now().Add(l.opts.WaitRetry).After(stop) {
 			break
