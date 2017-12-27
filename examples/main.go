@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/mushroomsir/redis-lock"
+	"github.com/teambition/redis-lock"
 	redis "gopkg.in/redis.v5"
 )
 
@@ -17,7 +17,7 @@ func init() {
 		Addr: "127.0.0.1:6379",
 	})
 	var err error
-	locker, err = redislock.NewLocker([]*redis.Client{client}, redislock.Options{})
+	locker, err = redislock.NewLocker([]redis.Cmdable{client}, redislock.Options{})
 	if err != nil {
 		log.Println(err)
 	}
