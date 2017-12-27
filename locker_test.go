@@ -11,24 +11,19 @@ import (
 )
 
 var locker *Locker
-var lockerWait *Locker
+var redisClient *redis.Client
 
 func init() {
-	client := redis.NewClient(&redis.Options{
+	redisClient = redis.NewClient(&redis.Options{
 		Addr: "127.0.0.1:6379",
 	})
-	log.Println(client.Ping())
+	log.Println(redisClient.Ping())
 	var err error
-	locker, err = NewLocker([]redis.Cmdable{client}, Options{})
+	locker, err = NewLocker([]redis.Cmdable{redisClient}, Options{})
 	if err != nil {
 		log.Println(err)
 	}
-	lockerWait, err = NewLocker([]redis.Cmdable{client}, Options{
-		WaitTimeout: 2 * time.Second,
-	})
-	if err != nil {
-		log.Println(err)
-	}
+
 }
 func TestWrongOpts(t *testing.T) {
 	assert := assert.New(t)
@@ -82,27 +77,46 @@ func TestLocker(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 }
 func TestLockerWait(t *testing.T) {
-	payment := randomValue()
-
 	assert := assert.New(t)
+	require := require.New(t)
+	lockerWait, err := NewLocker([]redis.Cmdable{redisClient}, Options{
+		KeyPrefix:   "test:",
+		LockTimeout: 300 * time.Millisecond,
+		WaitTimeout: 200 * time.Millisecond,
+	})
+	require.Nil(err)
+	require.NotNil(lockerWait)
+
+	payment := randomValue()
+	// successfull lock
 	lock, err := lockerWait.Lock(payment)
-	assert.Equal(defaultRedisKeyPrefix+payment, lock.lockkey)
+	assert.Equal(lockerWait.opts.KeyPrefix+payment, lock.lockkey)
 	assert.Nil(err)
 	assert.NotNil(lock)
 
-	// wait 2 second
+	// failed
 	nillock, err := lockerWait.Lock(payment)
 	assert.Equal(ErrGetLockFailed, err)
 	assert.Nil(nillock)
 
 	go func() {
-		time.Sleep(time.Second)
-		if assert.NotNil(lock) {
-			lock.Unlock()
-		}
+		time.Sleep(10 * time.Millisecond)
+		require.NotNil(lock)
+		lock.Unlock()
 	}()
 	// successfull wait
 	newlock, err := lockerWait.Lock(payment)
+	assert.Nil(err)
+	assert.NotNil(newlock)
+
+	// failed
+	nillock, err = lockerWait.Lock(payment)
+	assert.Equal(ErrGetLockFailed, err)
+	assert.Nil(nillock)
+
+	// the lock was expired, can lock
+	time.Sleep(100 * time.Millisecond)
+	newlock, err = lockerWait.Lock(payment)
 	assert.Nil(err)
 	assert.NotNil(newlock)
 }
@@ -115,6 +129,7 @@ func TestWrongRedis(t *testing.T) {
 	})
 	locker, err := NewLocker([]redis.Cmdable{client}, Options{})
 	assert.Nil(err)
-	_, err = locker.Lock("x")
+	l, err := locker.Lock("x")
+	assert.Nil(l)
 	assert.Equal(ErrGetLockFailed, err)
 }

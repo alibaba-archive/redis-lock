@@ -6,7 +6,6 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
@@ -120,12 +119,9 @@ func (l *Lock) lock() error {
 		successful := 0
 		start := time.Now()
 		for _, client := range l.clients {
-			ok, err := client.SetNX(l.lockkey, l.session, l.opts.LockTimeout).Result()
+			ok, _ := client.SetNX(l.lockkey, l.session, l.opts.LockTimeout).Result()
 			if ok {
 				successful++
-			}
-			if err != nil {
-				log.Println("redislock:", err)
 			}
 		}
 		drift := (l.opts.LockTimeout / 100) + (time.Millisecond * 2)

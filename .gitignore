@@ -6,3 +6,4 @@ make.ps1
 testdata/download
 testdata/fileserver
 make.bat
+*.exe
