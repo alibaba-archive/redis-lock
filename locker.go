@@ -42,7 +42,7 @@ type Options struct {
 }
 
 // NewLocker ...
-func NewLocker(clients []*redis.Client, opts Options) (*Locker, error) {
+func NewLocker(clients []redis.Cmdable, opts Options) (*Locker, error) {
 	if len(clients) == 0 {
 		return nil, ErrNoRedisClient
 	}
@@ -67,7 +67,7 @@ func NewLocker(clients []*redis.Client, opts Options) (*Locker, error) {
 
 // Locker ...
 type Locker struct {
-	clients []*redis.Client
+	clients []redis.Cmdable
 	opts    *Options
 }
 
@@ -91,7 +91,7 @@ func (l *Locker) Lock(key string) (*Lock, error) {
 type Lock struct {
 	session string
 	lockkey string
-	clients []*redis.Client
+	clients []redis.Cmdable
 	opts    *Options
 	clock   *sync.Mutex
 }

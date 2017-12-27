@@ -12,7 +12,7 @@ Base on [https://redis.io/topics/distlock](https://redis.io/topics/distlock)
 ## Installation
 
 ```sh
-go get github.com/mushroomsir/redis-lock -u
+go get -u github.com/mushroomsir/redis-lock
 ```
 ## Licenses
 

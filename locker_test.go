@@ -19,11 +19,11 @@ func init() {
 	})
 	log.Println(client.Ping())
 	var err error
-	locker, err = NewLocker([]*redis.Client{client}, Options{})
+	locker, err = NewLocker([]redis.Cmdable{client}, Options{})
 	if err != nil {
 		log.Println(err)
 	}
-	lockerWait, err = NewLocker([]*redis.Client{client}, Options{
+	lockerWait, err = NewLocker([]redis.Cmdable{client}, Options{
 		WaitTimeout: 2 * time.Second,
 	})
 	if err != nil {
@@ -32,11 +32,11 @@ func init() {
 }
 func TestWrongOpts(t *testing.T) {
 	assert := assert.New(t)
-	l, err := NewLocker([]*redis.Client{}, Options{})
+	l, err := NewLocker([]redis.Cmdable{}, Options{})
 	assert.NotNil(err)
 	assert.Nil(l)
 
-	l, err = NewLocker([]*redis.Client{&redis.Client{}, &redis.Client{}}, Options{})
+	l, err = NewLocker([]redis.Cmdable{&redis.Client{}, &redis.Client{}}, Options{})
 	assert.NotNil(err)
 	assert.Nil(l)
 }
@@ -113,7 +113,7 @@ func TestWrongRedis(t *testing.T) {
 	client := redis.NewClient(&redis.Options{
 		Addr: "127.0.0.1:9999",
 	})
-	locker, err := NewLocker([]*redis.Client{client}, Options{})
+	locker, err := NewLocker([]redis.Cmdable{client}, Options{})
 	assert.Nil(err)
 	_, err = locker.Lock("x")
 	assert.Equal(ErrGetLockFailed, err)
