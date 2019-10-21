@@ -135,6 +135,10 @@ func (l *Lock) lock() error {
 		if time.Now().Add(l.opts.WaitRetry).After(stop) {
 			break
 		}
+
+		for _, client := range l.clients {
+			client.Eval(luaRelease, []string{l.lockkey}, l.session)
+		}
 		time.Sleep(l.opts.WaitRetry)
 	}
 	return ErrGetLockFailed
