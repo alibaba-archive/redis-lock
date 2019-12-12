@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-redis/redis"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	redis "gopkg.in/redis.v5"
 )
 
 var locker *Locker

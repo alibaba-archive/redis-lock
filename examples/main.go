@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/teambition/redis-lock"
-	redis "gopkg.in/redis.v5"
+	"github.com/go-redis/redis"
+	redislock "github.com/teambition/redis-lock"
 )
 
 const payment = "payment"
