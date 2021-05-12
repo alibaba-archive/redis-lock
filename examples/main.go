@@ -14,7 +14,8 @@ var locker *redislock.Locker
 
 func init() {
 	client := redis.NewClient(&redis.Options{
-		Addr: "127.0.0.1:6379",
+		Addr:     "127.0.0.1:6379",
+		Password: "L7PxpiPPHwFApUhv",
 	})
 	var err error
 	locker, err = redislock.NewLocker([]redis.Cmdable{client}, redislock.Options{})
@@ -22,6 +23,7 @@ func init() {
 		log.Println(err)
 	}
 }
+
 func main() {
 
 	lock, err := locker.Lock(payment)

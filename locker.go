@@ -72,11 +72,18 @@ type Locker struct {
 
 // Lock lock
 func (l *Locker) Lock(key string) (*Lock, error) {
+	return l.LockWithExpiration(key, l.opts.LockTimeout)
+}
+
+// LockWithExpiration lock
+func (l *Locker) LockWithExpiration(key string, expiration time.Duration) (*Lock, error) {
+	opts := *l.opts
+	opts.LockTimeout = expiration
 	lock := &Lock{
 		session: randomValue(),
-		lockkey: l.opts.KeyPrefix + key,
+		lockkey: opts.KeyPrefix + key,
 		clients: l.clients,
-		opts:    l.opts,
+		opts:    opts,
 		clock:   new(sync.Mutex),
 	}
 	err := lock.lock()
@@ -91,7 +98,7 @@ type Lock struct {
 	session string
 	lockkey string
 	clients []redis.Cmdable
-	opts    *Options
+	opts    Options
 	clock   *sync.Mutex
 }
 

@@ -15,8 +15,10 @@ var redisClient *redis.Client
 
 func init() {
 	redisClient = redis.NewClient(&redis.Options{
-		Addr: "127.0.0.1:6379",
+		Addr:     "127.0.0.1:6379",
+		Password: "L7PxpiPPHwFApUhv",
 	})
+
 	log.Println(redisClient.Ping())
 	var err error
 	locker, err = NewLocker([]redis.Cmdable{redisClient}, Options{})
